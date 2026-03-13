@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+asyncpg
+python-decouple
+pydantic
+pytest
+pytest-asyncio
+httpx
