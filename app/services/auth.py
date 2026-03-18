@@ -32,14 +32,13 @@ async def register_user(data: UserRegister, db: AsyncSession):
         email=data.email,
         fullname=data.fullname,
         hashed_password=hash_password(data.password),
-        otp_code=otp,
-        otp_expires_at=otp_expires_at
+        # otp_code=otp,
+        # otp_expires_at=otp_expires_at
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    # Hozircha consolega, keyinchalik email bilan almashtirasiz
     print(f"[OTP] {user.email} uchun kod: {otp}")
 
     return user
