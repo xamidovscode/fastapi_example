@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException, status
 
+from app.core import config
 from app.models.user import User
 from app.schemas.auth import UserRegister
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
@@ -17,47 +18,33 @@ def generate_otp() -> str:
 
 
 async def register_user(data: UserRegister, db: AsyncSession, redis: Redis):
-    users = await db.execute(
-        select(User)
-        .where(
-            (User.email == data.email) | (User.username == data.username)
-        )
-    )
 
-    user = users.scalars().first()
+    email_result = await db.execute(select(User).where(User.email == data.email))
+    email_user = email_result.scalar_one_or_none()
+
+    username_result = await db.execute(select(User).where(User.username == data.username))
+    username_user = username_result.scalar_one_or_none()
+
+    if email_user and email_user.is_verified:
+        raise HTTPException(status_code=400, detail="Bu email band!")
+
+    if username_user and username_user.is_verified:
+        raise HTTPException(status_code=400, detail="Bu username band!")
+
+    if email_user and username_user and email_user.id != username_user.id:
+        raise HTTPException(status_code=400, detail="Bu email yoki username band!")
+
+    user = email_user or username_user
+
     cached_otp = await redis.get(f"otp:{data.email}")
+    if user and cached_otp:
+        raise HTTPException(status_code=400, detail="Sizga allaqachon tasdiqlash kodi yuborilgan!")
 
-    if user and user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Foydalanuvchi ro'yhatdan o'tgan!"
-        )
-
-    elif user and cached_otp:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Sizga allaqachon tasdiqlash kodi yuborilgan!"
-        )
-    elif user:
-
-        if user.email != data.email:
-            email_exists = await db.execute(select(User).where(User.email == data.email))
-            if email_exists.scalars().first():
-                raise HTTPException(
-                    status_code=400,
-                    detail="Bu email allaqachon ishlatilgan"
-                )
-
-        if user.username != data.username:
-            username_exists = await db.execute(select(User).where(User.username == data.username))
-            if username_exists.scalars().first():
-                raise HTTPException(
-                    status_code=400,
-                    detail="Bu username allaqachon ishlatilgan"
-                )
-
-        for key, value in data.dict(exclude_unset=True).items():
-            setattr(user, key, value)
+    if user:
+        user.username = data.username
+        user.email = data.email
+        user.fullname = data.fullname
+        user.hashed_password = hash_password(data.password)
     else:
         user = User(
             username=data.username,
@@ -71,7 +58,7 @@ async def register_user(data: UserRegister, db: AsyncSession, redis: Redis):
     await db.refresh(user)
 
     otp = generate_otp()
-    await redis.setex(f"otp:{user.email}", 120, otp)
+    await redis.setex(f"otp:{user.email}", config.OTP_LIFE_TIME, otp)
 
     return user
 
