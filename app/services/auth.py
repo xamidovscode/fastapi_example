@@ -1,6 +1,7 @@
 import random
 from datetime import datetime, timedelta, timezone
 
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException, status
@@ -11,10 +12,11 @@ from app.core.security import hash_password, verify_password, create_access_toke
 
 
 def generate_otp() -> str:
-    return str(random.randint(100000, 999999))
+    # return str(random.randint(100000, 999999))
+    return '77777'
 
 
-async def register_user(data: UserRegister, db: AsyncSession):
+async def register_user(data: UserRegister, db: AsyncSession, redis: Redis):
     existing = await db.execute(
         select(User).where((User.email == data.email) | (User.username == data.username))
     )
@@ -24,27 +26,25 @@ async def register_user(data: UserRegister, db: AsyncSession):
             detail="Email yoki username band"
         )
 
-    otp = generate_otp()
-    otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
-
     user = User(
         username=data.username,
         email=data.email,
         fullname=data.fullname,
         hashed_password=hash_password(data.password),
-        # otp_code=otp,
-        # otp_expires_at=otp_expires_at
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    otp = generate_otp()
+    await redis.setex(f"otp:{user.email}", 600, otp)  # 600 sekund = 10 daqiqa
 
     print(f"[OTP] {user.email} uchun kod: {otp}")
 
     return user
 
 
-async def verify_user(email: str, otp: str, db: AsyncSession):
+async def verify_user(email: str, otp: str, db: AsyncSession, redis: Redis):
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
@@ -54,16 +54,18 @@ async def verify_user(email: str, otp: str, db: AsyncSession):
     if user.is_verified:
         raise HTTPException(status_code=400, detail="Allaqachon tasdiqlangan")
 
-    if user.otp_code != otp:
+    cached_otp = await redis.get(f"otp:{user.email}")
+
+    if not cached_otp:
+        raise HTTPException(status_code=400, detail="OTP muddati o'tgan yoki yuborilmagan")
+
+    if cached_otp != otp:
         raise HTTPException(status_code=400, detail="OTP kod noto'g'ri")
 
-    if datetime.now(timezone.utc) > user.otp_expires_at:
-        raise HTTPException(status_code=400, detail="OTP kodning muddati o'tgan")
-
     user.is_verified = True
-    user.otp_code = None
-    user.otp_expires_at = None
     await db.commit()
+
+    await redis.delete(f"otp:{user.email}")
 
     return {"message": "Email muvaffaqiyatli tasdiqlandi"}
 

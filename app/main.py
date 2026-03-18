@@ -1,9 +1,20 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.api.v1 import user, auth
+from app.api.v1 import auth
+from app.core.redis import init_redis, close_redis
 
-app = FastAPI(title="IMB Edu Platform API - Test IP Telephony")
 
-app.include_router(user.router, prefix="/api/v1/users", tags=["Users"])
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_redis()
+    yield
+    await close_redis()
+
+
+app = FastAPI(
+    lifespan=lifespan,
+    title="IMB Edu Platform API - Test IP Telephony"
+)
 app.include_router(auth.router, prefix="/api/v1", tags=["Auth"])
 
 @app.get("/")
