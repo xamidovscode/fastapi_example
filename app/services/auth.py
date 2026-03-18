@@ -121,6 +121,6 @@ async def login_user(email: str, password: str, db: AsyncSession):
     payload = {"sub": str(user.id), "email": user.email}
     return {
         "access_token": create_access_token(payload),
-        # "refresh_token": create_refresh_token(payload),
+        "refresh_token": create_refresh_token(payload),
         "token_type": "bearer"
     }
