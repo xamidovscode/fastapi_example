@@ -13,3 +13,8 @@ async def list_users(db: AsyncSession = Depends(get_db)):
 @router.post("/", response_model=UserRead)
 async def add_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     return await create_user(db, username=user.username)
+
+
+
+
+
