@@ -17,29 +17,61 @@ def generate_otp() -> str:
 
 
 async def register_user(data: UserRegister, db: AsyncSession, redis: Redis):
-    existing = await db.execute(
-        select(User).where((User.email == data.email) | (User.username == data.username))
+    users = await db.execute(
+        select(User)
+        .where(
+            (User.email == data.email) | (User.username == data.username)
+        )
     )
-    if existing.scalar_one_or_none():
+
+    user = users.scalars().first()
+    cached_otp = await redis.get(f"otp:{data.email}")
+
+    if user and user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email yoki username band"
+            detail=f"Foydalanuvchi ro'yhatdan o'tgan!"
         )
 
-    user = User(
-        username=data.username,
-        email=data.email,
-        fullname=data.fullname,
-        hashed_password=hash_password(data.password),
-    )
-    db.add(user)
+    elif user and cached_otp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Sizga allaqachon tasdiqlash kodi yuborilgan!"
+        )
+    elif user:
+
+        if user.email != data.email:
+            email_exists = await db.execute(select(User).where(User.email == data.email))
+            if email_exists.scalars().first():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Bu email allaqachon ishlatilgan"
+                )
+
+        if user.username != data.username:
+            username_exists = await db.execute(select(User).where(User.username == data.username))
+            if username_exists.scalars().first():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Bu username allaqachon ishlatilgan"
+                )
+
+        for key, value in data.dict(exclude_unset=True).items():
+            setattr(user, key, value)
+    else:
+        user = User(
+            username=data.username,
+            email=data.email,
+            fullname=data.fullname,
+            hashed_password=hash_password(data.password),
+        )
+        db.add(user)
+
     await db.commit()
     await db.refresh(user)
 
     otp = generate_otp()
-    await redis.setex(f"otp:{user.email}", 600, otp)  # 600 sekund = 10 daqiqa
-
-    print(f"[OTP] {user.email} uchun kod: {otp}")
+    await redis.setex(f"otp:{user.email}", 120, otp)
 
     return user
 
@@ -89,6 +121,6 @@ async def login_user(email: str, password: str, db: AsyncSession):
     payload = {"sub": str(user.id), "email": user.email}
     return {
         "access_token": create_access_token(payload),
-        "refresh_token": create_refresh_token(payload),
+        # "refresh_token": create_refresh_token(payload),
         "token_type": "bearer"
     }
