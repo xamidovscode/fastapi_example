@@ -1,6 +1,4 @@
-from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
-from sqlalchemy.sql import func
+from sqlalchemy import Column, String, Boolean
 
 from app.models.common import BaseModel
 
