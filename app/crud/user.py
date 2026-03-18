@@ -7,7 +7,7 @@ async def get_users(db: AsyncSession):
     result = await db.execute(select(User))
     return result.scalars().all()
 
-async def create_user(db: AsyncSession, username: str, email: str):
+async def create_user(db: AsyncSession, username: str):
     user = User(username=username)
     db.add(user)
     await db.commit()
