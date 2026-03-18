@@ -9,10 +9,9 @@ from alembic import context
 
 # === Sizning modellarni import qiling ===
 from app.core.config import DATABASE_URL
-from app.db.base import Base  # Base shu yerda bo'lishi kerak
+from app.db.base import Base
 
-# Barcha modellar import bo'lishi uchun (autogenerate ishlashi uchun)
-from app.models import user  # har bir model faylini shu yerga qo'shing
+from app.models import user
 
 config = context.config
 
