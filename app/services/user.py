@@ -25,3 +25,4 @@ async def update_profile(data: UserUpdateRequest, current_user: User, db: AsyncS
     await db.commit()
     await db.refresh(current_user)
     return current_user
+

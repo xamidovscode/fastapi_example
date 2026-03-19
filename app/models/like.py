@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from app.models.common import BaseModel
 
-class Comment(BaseModel):
+class Like(BaseModel):
     __tablename__ = "likes"
 
     post_id = Column(

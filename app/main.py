@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.api.v1 import auth, user, admin
+from app.api.v1 import auth, user, admin, posts
 from app.core.redis import init_redis, close_redis
 
 
@@ -13,11 +13,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title="IMB Edu Platform API - Test IP Telephony"
+    title="IMB Edu Platform API - Test IP Telephony",
+    swagger_ui_parameters={"persistAuthorization": True}
+
 )
 app.include_router(auth.router, prefix="/api/v1", tags=["Auth"])
 app.include_router(user.router, prefix="/api/v1", tags=["User"])
 app.include_router(admin.router, prefix="/api/v1", tags=["Admin"])
+app.include_router(posts.router, prefix="/api/v1", tags=["Posts"])
 
 @app.get("/")
 async def root():
