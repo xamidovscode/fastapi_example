@@ -62,5 +62,8 @@ async def delete_post_api(
         if not post.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Post not found")
         raise HTTPException(status_code=403, detail="Not your post")
+    return {
+        'success': True,
+    }
 
 
